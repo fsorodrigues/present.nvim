@@ -76,15 +76,6 @@ M.create_system_executor = function(program)
   end
 end
 
-local defaults = {
-  executors = {
-    lua = execute_lua_code,
-    javascript = M.create_system_executor("node"),
-    python = M.create_system_executor("python"),
-    rust = execute_rust_code,
-  },
-}
-
 ---@class present.Options
 ---@field executors table<string, function>: The executors for the different languages
 ---@field syntax present.SyntaxOptions: The syntax for the plugin
@@ -99,13 +90,18 @@ local options = {
     comment = "%%",
     stop = "<!%-%-%s*stop%s*%-%->",
   },
-  executors = {},
+  executors = {
+    lua = execute_lua_code,
+    javascript = M.create_system_executor("node"),
+    python = M.create_system_executor("python"),
+    rust = execute_rust_code,
+  },
 }
 
 --- Setup the plugin
 ---@param opts present.Options
 M.setup = function(opts)
-  options = vim.tbl_deep_extend("force", defaults, opts or {})
+  options = vim.tbl_deep_extend("force", options, opts or {})
 end
 
 ---@class present.Slides
@@ -357,7 +353,7 @@ M.start_presentation = function(opts)
 
     local executor = options.executors[block.language]
     if not executor then
-      print("No valid executor for this language")
+      print("No valid executor for this language:", block.language)
       return
     end
 
@@ -376,7 +372,7 @@ M.start_presentation = function(opts)
     local buf = vim.api.nvim_create_buf(false, true) -- No file, scratch buffer
     local temp_width = math.floor(vim.o.columns * 0.8)
     local temp_height = math.floor(vim.o.lines * 0.8)
-    vim.api.nvim_open_win(buf, true, {
+    local win = vim.api.nvim_open_win(buf, true, {
       relative = "editor",
       style = "minimal",
       noautocmd = true,
@@ -389,6 +385,10 @@ M.start_presentation = function(opts)
 
     vim.bo[buf].filetype = "markdown"
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, output)
+
+    vim.keymap.set("n", "q", function()
+      vim.api.nvim_win_close(win, true)
+    end, { buffer = buf })
   end)
 
   local restore = {
@@ -396,10 +396,10 @@ M.start_presentation = function(opts)
       original = vim.o.cmdheight,
       present = 0,
     },
-    guicursor = {
-      original = vim.o.guicursor,
-      present = "n:NormalFloat",
-    },
+    -- guicursor = {
+    --   original = vim.o.guicursor,
+    --   present = "n:normalFloat",
+    -- },
     wrap = {
       original = vim.o.wrap,
       present = true,
@@ -419,7 +419,7 @@ M.start_presentation = function(opts)
     vim.opt[option] = config.present
   end
 
-  vim.api.nvim_create_autocmd("BufLeave", {
+  vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
     buffer = state.floats.body.buf,
     callback = function()
       -- Reset the values when we are done with the presentation
@@ -452,14 +452,6 @@ M.start_presentation = function(opts)
 
   set_slide_content(state.current_slide)
 end
-
--- vim.print(parse_slides {
---   "# Hello",
---   "this is something else",
---   "# World",
---   "this is another thing",
--- })
--- M.start_presentation { bufnr = 1 }
 
 M._parse_slides = parse_slides
 
