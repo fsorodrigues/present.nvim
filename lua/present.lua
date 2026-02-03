@@ -319,8 +319,8 @@ M.start_presentation = function(opts)
 
     local slide = state.parsed.slides[idx]
 
-    local padding = string.rep(" ", (width - #slide.title) / 2)
-    local title = padding .. slide.title
+    local padding = string.rep(" ", (width - #slide.title - 2) / 2)
+    local title = padding .. string.gsub(slide.title, "# ", "", 1)
     vim.api.nvim_buf_set_lines(state.floats.header.buf, 0, -1, false, { title })
     vim.api.nvim_buf_set_lines(state.floats.body.buf, 0, -1, false, slide.body)
 
